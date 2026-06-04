@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="GHTK Scanner">
+<title>GHTK Scanner</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --red: #e8392a;
+    --red-dark: #c02d20;
+    --bg: #f5f5f3;
+    --surface: #ffffff;
+    --surface2: #f0efeb;
+    --border: rgba(0,0,0,0.1);
+    --border2: rgba(0,0,0,0.18);
+    --text: #1a1a18;
+    --text2: #6b6b67;
+    --text3: #a3a39e;
+    --success-bg: #eaf3de;
+    --success-text: #3b6d11;
+    --success-border: rgba(59,109,17,0.25);
+    --warn-bg: #faeeda;
+    --warn-text: #854f0b;
+    --radius: 10px;
+    --radius-lg: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a18;
+      --surface: #252523;
+      --surface2: #2e2e2c;
+      --border: rgba(255,255,255,0.1);
+      --border2: rgba(255,255,255,0.18);
+      --text: #f0efe9;
+      --text2: #a3a39e;
+      --text3: #6b6b67;
+      --success-bg: #173404;
+      --success-text: #97c459;
+      --success-border: rgba(99,153,34,0.3);
+      --warn-bg: #412402;
+      --warn-text: #ef9f27;
+    }
+  }
+  html, body { height: 100%; overflow: hidden; font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; background: var(--bg); color: var(--text); }
+  #app { display: flex; flex-direction: column; height: 100dvh; max-width: 480px; margin: 0 auto; background: var(--bg); }
+
+  /* Header */
+  .header { background: var(--surface); border-bottom: 0.5px solid var(--border); padding: 12px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .logo { width: 34px; height: 34px; background: var(--red); border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .logo i { color: #fff; font-size: 19px; }
+  .header-text h1 { font-size: 16px; font-weight: 600; color: var(--text); }
+  .header-text p { font-size: 12px; color: var(--text2); margin-top: 1px; }
+  .badge { margin-left: auto; background: var(--red); color: #fff; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 20px; min-width: 26px; text-align: center; }
+
+  /* Scrollable body */
+  .body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+
+  /* Scanner */
+  .scanner-card { background: var(--surface); border-radius: var(--radius-lg); border: 0.5px solid var(--border); overflow: hidden; }
+  .cam-placeholder { padding: 32px 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; }
+  .cam-placeholder i { font-size: 44px; color: var(--text3); }
+  .cam-placeholder p { font-size: 15px; font-weight: 500; color: var(--text2); }
+  .cam-placeholder span { font-size: 12px; color: var(--text3); }
+  .cam-wrapper { position: relative; width: 100%; aspect-ratio: 1; background: #000; }
+  #reader { width: 100%; height: 100%; }
+  #reader video { width: 100% !important; height: 100% !important; object-fit: cover; display: block; }
+  #reader img { display: none !important; }
+  .scan-overlay { position: absolute; inset: 0; pointer-events: none; display: flex; align-items: center; justify-content: center; }
+  .scan-frame { width: 58%; height: 58%; position: relative; }
+  .c-tl, .c-tr, .c-bl, .c-br { position: absolute; width: 22px; height: 22px; border-color: #fff; border-style: solid; }
+  .c-tl { top: 0; left: 0; border-width: 3px 0 0 3px; }
+  .c-tr { top: 0; right: 0; border-width: 3px 3px 0 0; }
+  .c-bl { bottom: 0; left: 0; border-width: 0 0 3px 3px; }
+  .c-br { bottom: 0; right: 0; border-width: 0 3px 3px 0; }
+  .scan-line { position: absolute; width: 80%; left: 10%; height: 2px; background: rgba(232,57,42,0.85); animation: scan 2s ease-in-out infinite; }
+  @keyframes scan { 0%,100%{top:15%} 50%{top:78%} }
+  .scanner-actions { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .btn-scan { width: 100%; padding: 13px; border: none; border-radius: var(--radius); font-size: 15px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--red); color: #fff; }
+  .btn-scan:active { background: var(--red-dark); }
+  .btn-stop { width: 100%; padding: 13px; border: 0.5px solid var(--border2); border-radius: var(--radius); font-size: 15px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--surface2); color: var(--text); }
+  .btn-stop:active { opacity: 0.75; }
+  .result-flash { padding: 10px 13px; border-radius: var(--radius); font-size: 13px; display: flex; align-items: center; gap: 8px; }
+  .result-ok { background: var(--success-bg); color: var(--success-text); border: 0.5px solid var(--success-border); }
+  .result-warn { background: var(--warn-bg); color: var(--warn-text); }
+
+  /* Manual input */
+  .manual-card { background: var(--surface); border-radius: var(--radius-lg); border: 0.5px solid var(--border); padding: 12px; }
+  .section-label { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px; }
+  .manual-row { display: flex; gap: 8px; }
+  .manual-row input { flex: 1; padding: 10px 12px; border: 0.5px solid var(--border2); border-radius: var(--radius); font-size: 14px; background: var(--surface2); color: var(--text); outline: none; }
+  .manual-row input:focus { border-color: var(--red); }
+  .manual-row button { padding: 10px 14px; border: 0.5px solid var(--border2); border-radius: var(--radius); background: var(--surface2); color: var(--text); font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+  .manual-row button:active { background: var(--border); }
+
+  /* List */
+  .list-card { background: var(--surface); border-radius: var(--radius-lg); border: 0.5px solid var(--border); flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+  .list-header { padding: 12px 14px 10px; display: flex; align-items: center; justify-content: space-between; border-bottom: 0.5px solid var(--border); flex-shrink: 0; }
+  .list-header h2 { font-size: 14px; font-weight: 500; color: var(--text2); }
+  .list-actions { display: flex; gap: 6px; }
+  .btn-export { font-size: 12px; color: var(--text2); background: var(--surface2); border: 0.5px solid var(--border); border-radius: 8px; padding: 5px 10px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+  .btn-export:active { opacity: 0.75; }
+  .btn-clear { font-size: 12px; color: var(--red); background: none; border: none; cursor: pointer; padding: 5px 8px; border-radius: 8px; }
+  .btn-clear:active { background: var(--warn-bg); }
+  .list-inner { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 8px; }
+  .empty-state { text-align: center; padding: 40px 16px; color: var(--text3); font-size: 13px; }
+  .empty-state i { font-size: 36px; display: block; margin-bottom: 10px; }
+  .order-card { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius); border: 0.5px solid var(--border); background: var(--bg); margin-bottom: 6px; }
+  .order-num { width: 26px; height: 26px; border-radius: 50%; background: var(--surface2); font-size: 11px; font-weight: 600; color: var(--text2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .order-info { flex: 1; min-width: 0; }
+  .order-code { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: 'Menlo', 'Courier New', monospace; letter-spacing: 0.3px; }
+  .order-time { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .copy-btn { flex-shrink: 0; padding: 6px 11px; background: var(--surface2); border: 0.5px solid var(--border); border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; color: var(--text2); transition: background 0.15s; }
+  .copy-btn.copied { background: var(--success-bg); color: var(--success-text); border-color: var(--success-border); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <div class="logo"><i class="ti ti-package"></i></div>
+    <div class="header-text">
+      <h1>GHTK Scanner</h1>
+      <p>Quét mã vận đơn</p>
+    </div>
+    <div class="badge" id="count-badge">0</div>
+  </div>
+
+  <div class="body">
+    <!-- Scanner -->
+    <div class="scanner-card">
+      <div id="cam-area">
+        <div class="cam-placeholder" onclick="startScan()">
+          <i class="ti ti-scan"></i>
+          <p>Nhấn để mở camera</p>
+          <span>Hỗ trợ QR code &amp; Barcode</span>
+        </div>
+      </div>
+      <div class="scanner-actions">
+        <div id="scan-result" style="display:none;"></div>
+        <button class="btn-scan" id="main-btn" onclick="startScan()">
+          <i class="ti ti-camera"></i> Bắt đầu quét
+        </button>
+      </div>
+    </div>
+
+    <!-- Manual -->
+    <div class="manual-card">
+      <div class="section-label">Nhập thủ công</div>
+      <div class="manual-row">
+        <input type="text" id="manual-input" placeholder="Nhập mã vận đơn..." autocomplete="off" />
+        <button onclick="addManual()"><i class="ti ti-plus"></i> Thêm</button>
+      </div>
+    </div>
+
+    <!-- List -->
+    <div class="list-card">
+      <div class="list-header">
+        <h2>Danh sách đã quét</h2>
+        <div class="list-actions">
+          <button class="btn-export" onclick="exportCSV()"><i class="ti ti-download" style="font-size:14px"></i> Xuất CSV</button>
+          <button class="btn-clear" onclick="clearAll()"><i class="ti ti-trash" style="font-size:14px"></i> Xoá</button>
+        </div>
+      </div>
+      <div class="list-inner" id="order-list">
+        <div class="empty-state"><i class="ti ti-inbox"></i>Chưa có mã nào.<br>Quét để bắt đầu!</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let scanner = null;
+  let scanning = false;
+  let orders = [];
+
+  try { orders = JSON.parse(localStorage.getItem('ghtk_orders') || '[]'); } catch(e) { orders = []; }
+
+  function save() {
+    try { localStorage.setItem('ghtk_orders', JSON.stringify(orders)); } catch(e) {}
+  }
+
+  function renderList() {
+    document.getElementById('count-badge').textContent = orders.length;
+    const el = document.getElementById('order-list');
+    if (!orders.length) {
+      el.innerHTML = '<div class="empty-state"><i class="ti ti-inbox"></i>Chưa có mã nào.<br>Quét để bắt đầu!</div>';
+      return;
+    }
+    el.innerHTML = orders.map((o, i) => `
+      <div class="order-card">
+        <div class="order-num">${orders.length - i}</div>
+        <div class="order-info">
+          <div class="order-code">${escHtml(o.code)}</div>
+          <div class="order-time">${o.time}</div>
+        </div>
+        <button class="copy-btn" id="cb${i}" onclick="copyCode('${escAttr(o.code)}',${i})">
+          <i class="ti ti-copy" style="font-size:14px"></i> Copy
+        </button>
+      </div>
+    `).join('');
+  }
+
+  function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function escAttr(s) { return s.replace(/'/g,"\\'"); }
+
+  function showResult(msg, ok) {
+    const el = document.getElementById('scan-result');
+    el.style.display = 'flex';
+    el.className = 'result-flash ' + (ok ? 'result-ok' : 'result-warn');
+    el.textContent = msg;
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.style.display = 'none'; }, 3000);
+  }
+
+  function addCode(raw) {
+    const code = raw.trim();
+    if (!code) return;
+    if (orders.find(o => o.code === code)) {
+      showResult('⚠ Mã này đã có trong danh sách', false); return;
+    }
+    const now = new Date();
+    const time = now.toLocaleString('vi-VN', {hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit', year:'numeric'});
+    orders.unshift({ code, time });
+    save(); renderList();
+    showResult('✓ Đã thêm: ' + code, true);
+  }
+
+  function addManual() {
+    const inp = document.getElementById('manual-input');
+    if (inp.value.trim()) { addCode(inp.value); inp.value = ''; }
+  }
+
+  document.getElementById('manual-input').addEventListener('keydown', e => { if (e.key === 'Enter') addManual(); });
+
+  function copyCode(code, idx) {
+    const btn = document.getElementById('cb' + idx);
+    const done = () => {
+      if (btn) { btn.classList.add('copied'); btn.innerHTML = '<i class="ti ti-check" style="font-size:14px"></i> Đã copy'; setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = '<i class="ti ti-copy" style="font-size:14px"></i> Copy'; }, 2000); }
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(done).catch(() => fallbackCopy(code, done));
+    } else { fallbackCopy(code, done); }
+  }
+
+  function fallbackCopy(text, cb) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try { document.execCommand('copy'); } catch(e) {}
+    document.body.removeChild(ta); if (cb) cb();
+  }
+
+  function clearAll() {
+    if (!orders.length) return;
+    if (confirm('Xoá tất cả ' + orders.length + ' mã vận đơn?')) {
+      orders = []; save(); renderList();
+    }
+  }
+
+  function exportCSV() {
+    if (!orders.length) { alert('Chưa có mã nào để xuất.'); return; }
+    const rows = [['STT','Mã vận đơn','Thời gian quét']].concat(orders.map((o,i) => [orders.length-i, o.code, o.time]));
+    const csv = '\uFEFF' + rows.map(r => r.map(c => '"' + String(c).replace(/"/g,'""') + '"').join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    a.download = 'ghtk_' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click(); URL.revokeObjectURL(url);
+  }
+
+  function setMainBtn(label, icon, fn, stop) {
+    const btn = document.getElementById('main-btn');
+    btn.className = stop ? 'btn-stop' : 'btn-scan';
+    btn.innerHTML = `<i class="ti ${icon}"></i> ${label}`;
+    btn.onclick = fn;
+  }
+
+  function startScan() {
+    if (scanning) return;
+    scanning = true;
+    const area = document.getElementById('cam-area');
+    area.innerHTML = `<div class="cam-wrapper"><div id="reader"></div><div class="scan-overlay"><div class="scan-frame"><div class="c-tl"></div><div class="c-tr"></div><div class="c-bl"></div><div class="c-br"></div><div class="scan-line"></div></div></div></div>`;
+    setMainBtn('Dừng quét', 'ti-camera-off', stopScan, true);
+
+    scanner = new Html5Qrcode('reader');
+    const formats = [
+      Html5QrcodeSupportedFormats.QR_CODE,
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.ITF,
+      Html5QrcodeSupportedFormats.DATA_MATRIX,
+    ];
+    scanner.start(
+      { facingMode: 'environment' },
+      { fps: 12, qrbox: { width: 230, height: 230 }, formatsToSupport: formats },
+      (text) => { addCode(text); },
+      () => {}
+    ).catch(err => {
+      scanning = false; scanner = null;
+      area.innerHTML = `<div class="cam-placeholder" onclick="startScan()"><i class="ti ti-camera-off"></i><p>Không thể mở camera</p><span>${err.message || 'Kiểm tra quyền truy cập'}</span></div>`;
+      setMainBtn('Thử lại', 'ti-refresh', startScan, false);
+    });
+  }
+
+  function stopScan() {
+    if (!scanner) return;
+    scanner.stop().finally(() => {
+      scanning = false; scanner = null;
+      const area = document.getElementById('cam-area');
+      area.innerHTML = `<div class="cam-placeholder" onclick="startScan()"><i class="ti ti-scan"></i><p>Nhấn để mở camera</p><span>Hỗ trợ QR code &amp; Barcode</span></div>`;
+      setMainBtn('Bắt đầu quét', 'ti-camera', startScan, false);
+    });
+  }
+
+  renderList();
+</script>
+</body>
+</html>
