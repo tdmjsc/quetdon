@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Vận Đơn Scanner">
+<title>Vận Đơn Scanner</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --accent:#1a1a18;
+  --bg:#f5f5f3;--surface:#fff;--surface2:#f0efeb;
+  --border:rgba(0,0,0,0.1);--border2:rgba(0,0,0,0.2);
+  --text:#1a1a18;--text2:#6b6b67;--text3:#a3a39e;
+  --ok-bg:#eaf3de;--ok-text:#3b6d11;--ok-bd:rgba(59,109,17,0.25);
+  --warn-bg:#faeeda;--warn-text:#854f0b;
+  --err-bg:#fcebeb;--err-text:#a32d2d;
+  --r:10px;--rl:14px;
+}
+@media(prefers-color-scheme:dark){:root{
+  --bg:#1a1a18;--surface:#252523;--surface2:#2e2e2c;
+  --border:rgba(255,255,255,0.1);--border2:rgba(255,255,255,0.2);
+  --text:#f0efe9;--text2:#a3a39e;--text3:#6b6b67;
+  --ok-bg:#173404;--ok-text:#97c459;--ok-bd:rgba(99,153,34,0.3);
+  --warn-bg:#412402;--warn-text:#ef9f27;
+  --err-bg:#501313;--err-text:#f09595;
+}}
+html,body{height:100%;overflow:hidden;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;background:var(--bg);color:var(--text)}
+#app{display:flex;flex-direction:column;height:100dvh;max-width:480px;margin:0 auto;background:var(--bg)}
+
+.header{background:var(--surface);border-bottom:0.5px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.logo{width:34px;height:34px;background:var(--accent);border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.logo i{color:#fff;font-size:19px}
+.header-text h1{font-size:16px;font-weight:600}
+.header-text p{font-size:12px;color:var(--text2);margin-top:1px}
+.badge{margin-left:auto;background:var(--accent);color:#fff;font-size:12px;font-weight:600;padding:3px 9px;border-radius:20px;min-width:26px;text-align:center}
+
+.body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px;display:flex;flex-direction:column;gap:10px}
+
+/* Mode tabs */
+.tabs{display:flex;background:var(--surface);border-radius:var(--rl);border:0.5px solid var(--border);padding:4px;gap:4px;flex-shrink:0}
+.tab{flex:1;padding:9px 8px;border:none;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;background:transparent;color:var(--text2);display:flex;align-items:center;justify-content:center;gap:6px;transition:all 0.15s}
+.tab.active{background:var(--accent);color:#fff}
+.tab i{font-size:16px}
+
+/* Scan panels */
+.panel{display:none}
+.panel.active{display:flex;flex-direction:column;gap:10px}
+
+/* OCR camera */
+.ocr-card{background:var(--surface);border-radius:var(--rl);border:0.5px solid var(--border);overflow:hidden}
+.cam-live-wrap{position:relative;width:100%;aspect-ratio:4/3;background:#000}
+#ocr-video{width:100%;height:100%;object-fit:cover;display:block}
+.cam-guide{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:14px;pointer-events:none}
+.cam-guide-box{width:88%;height:28%;border:2px solid rgba(255,255,255,0.7);border-radius:8px;position:absolute;top:50%;left:50%;transform:translate(-50%,-52%)}
+.cam-guide span{font-size:11px;color:rgba(255,255,255,0.8);background:rgba(0,0,0,0.45);padding:3px 10px;border-radius:20px}
+.snap-btn{width:56px;height:56px;border-radius:50%;background:#fff;border:3px solid rgba(255,255,255,0.5);cursor:pointer;position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.3)}
+.snap-btn i{font-size:24px;color:#1a1a18}
+.snap-btn:active{transform:translateX(-50%) scale(0.93)}
+
+/* Preview + result */
+.preview-wrap{position:relative;width:100%;aspect-ratio:4/3;background:#000}
+#preview-canvas{width:100%;height:100%;object-fit:contain;display:block}
+.preview-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.55)}
+.processing-text{color:#fff;font-size:14px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.spinner{width:32px;height:32px;border:3px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.ocr-actions{padding:10px;display:flex;flex-direction:column;gap:8px}
+.flash{padding:10px 13px;border-radius:var(--r);font-size:13px;display:flex;align-items:flex-start;gap:8px}
+.flash-ok{background:var(--ok-bg);color:var(--ok-text);border:0.5px solid var(--ok-bd)}
+.flash-warn{background:var(--warn-bg);color:var(--warn-text)}
+.flash-err{background:var(--err-bg);color:var(--err-text)}
+
+/* Found codes list */
+.found-list{display:flex;flex-direction:column;gap:6px}
+.found-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r);border:0.5px solid var(--ok-bd);background:var(--ok-bg)}
+.found-code{flex:1;font-family:'Menlo','Courier New',monospace;font-size:14px;font-weight:600;color:var(--ok-text)}
+.btn-add-found{padding:6px 12px;background:var(--ok-text);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
+.btn-add-found:active{opacity:0.8}
+.btn-add-found.added{background:var(--text3);cursor:default}
+
+.btn-primary{width:100%;padding:13px;border:none;border-radius:var(--r);font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--accent);color:#fff}
+.btn-primary:active{opacity:0.8}
+.btn-secondary{width:100%;padding:11px;border:0.5px solid var(--border2);border-radius:var(--r);font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--surface2);color:var(--text)}
+.btn-secondary:active{opacity:0.75}
+
+/* Barcode panel */
+.bc-card{background:var(--surface);border-radius:var(--rl);border:0.5px solid var(--border);overflow:hidden}
+.bc-cam-wrap{position:relative;width:100%;aspect-ratio:1;background:#000}
+#bc-video{width:100%;height:100%;object-fit:cover;display:block}
+.bc-overlay{position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center}
+.bc-frame{width:72%;height:38%;position:relative}
+.c-tl,.c-tr,.c-bl,.c-br{position:absolute;width:20px;height:20px;border-color:#fff;border-style:solid}
+.c-tl{top:0;left:0;border-width:3px 0 0 3px}
+.c-tr{top:0;right:0;border-width:3px 3px 0 0}
+.c-bl{bottom:0;left:0;border-width:0 0 3px 3px}
+.c-br{bottom:0;right:0;border-width:0 3px 3px 0}
+.bc-line{position:absolute;width:80%;left:10%;height:2px;background:rgba(220,50,30,0.85);animation:scan 2s ease-in-out infinite}
+@keyframes scan{0%,100%{top:8%}50%{top:84%}}
+.bc-hint{position:absolute;bottom:10px;left:0;right:0;text-align:center;color:rgba(255,255,255,0.75);font-size:11px;pointer-events:none}
+.bc-placeholder{padding:28px 16px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer}
+.bc-placeholder i{font-size:44px;color:var(--text3)}
+.bc-placeholder p{font-size:15px;font-weight:500;color:var(--text2)}
+.bc-placeholder span{font-size:12px;color:var(--text3)}
+.bc-actions{padding:10px;display:flex;flex-direction:column;gap:8px}
+
+/* Manual */
+.manual-card{background:var(--surface);border-radius:var(--rl);border:0.5px solid var(--border);padding:12px}
+.section-label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px}
+.manual-row{display:flex;gap:8px}
+.manual-row input{flex:1;padding:10px 12px;border:0.5px solid var(--border2);border-radius:var(--r);font-size:14px;background:var(--surface2);color:var(--text);outline:none}
+.manual-row input:focus{border-color:var(--accent)}
+.manual-row button{padding:10px 14px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--surface2);color:var(--text);font-size:14px;font-weight:500;cursor:pointer}
+
+/* List */
+.list-card{background:var(--surface);border-radius:var(--rl);border:0.5px solid var(--border);min-height:160px;overflow:hidden;display:flex;flex-direction:column}
+.list-hdr{padding:12px 14px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:0.5px solid var(--border);flex-shrink:0}
+.list-hdr h2{font-size:14px;font-weight:500;color:var(--text2)}
+.list-acts{display:flex;gap:6px}
+.btn-exp{font-size:12px;color:var(--text2);background:var(--surface2);border:0.5px solid var(--border);border-radius:8px;padding:5px 10px;cursor:pointer;display:flex;align-items:center;gap:4px}
+.btn-clr{font-size:12px;color:#c22a1a;background:none;border:none;cursor:pointer;padding:5px 8px;border-radius:8px}
+.list-inner{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px}
+.empty-state{text-align:center;padding:32px 16px;color:var(--text3);font-size:13px}
+.empty-state i{font-size:36px;display:block;margin-bottom:10px}
+.order-card{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r);border:0.5px solid var(--border);background:var(--bg);margin-bottom:6px}
+.order-num{width:26px;height:26px;border-radius:50%;background:var(--surface2);font-size:11px;font-weight:600;color:var(--text2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.order-info{flex:1;min-width:0}
+.order-code{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'Menlo','Courier New',monospace;letter-spacing:0.3px}
+.order-meta{font-size:11px;color:var(--text3);margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.carrier-badge{display:inline-block;font-size:10px;font-weight:600;padding:1px 6px;border-radius:20px}
+.c-vtp{background:#fff0ee;color:#c22a1a}
+.c-ghtk{background:#eaf3de;color:#3b6d11}
+.c-other{background:var(--surface2);color:var(--text3)}
+.copy-btn{flex-shrink:0;padding:6px 11px;background:var(--surface2);border:0.5px solid var(--border);border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:12px;font-weight:500;color:var(--text2)}
+.copy-btn.copied{background:var(--ok-bg);color:var(--ok-text);border-color:var(--ok-bd)}
+#photo-input{display:none}
+canvas{display:none}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <div class="logo"><i class="ti ti-package"></i></div>
+    <div class="header-text">
+      <h1>Vận Đơn Scanner</h1>
+      <p>GHTK · Viettel Post</p>
+    </div>
+    <div class="badge" id="count-badge">0</div>
+  </div>
+
+  <div class="body">
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('ocr')" id="tab-ocr">
+        <i class="ti ti-camera-spark"></i> Đọc chữ (OCR)
+      </button>
+      <button class="tab" onclick="switchTab('barcode')" id="tab-barcode">
+        <i class="ti ti-barcode"></i> Barcode/QR
+      </button>
+    </div>
+
+    <!-- OCR Panel -->
+    <div class="panel active" id="panel-ocr">
+      <div class="ocr-card">
+        <div id="ocr-cam-area">
+          <div class="cam-live-wrap">
+            <video id="ocr-video" autoplay playsinline muted></video>
+            <div class="cam-guide">
+              <div class="cam-guide-box"></div>
+              <span>Căn chỉnh mã DHLOG vào khung rồi nhấn chụp</span>
+            </div>
+            <button class="snap-btn" onclick="snapPhoto()" title="Chụp ảnh">
+              <i class="ti ti-camera"></i>
+            </button>
+          </div>
+        </div>
+        <div class="ocr-actions">
+          <div id="ocr-result" style="display:none"></div>
+          <div id="found-codes" style="display:none">
+            <div class="section-label" style="margin-bottom:6px">Mã tìm được — nhấn để lưu</div>
+            <div class="found-list" id="found-list"></div>
+          </div>
+          <button class="btn-secondary" onclick="document.getElementById('photo-input').click()">
+            <i class="ti ti-photo"></i> Chọn ảnh từ thư viện
+          </button>
+          <input type="file" id="photo-input" accept="image/*" capture="environment" onchange="ocrFromFile(this)">
+        </div>
+      </div>
+
+      <div class="manual-card">
+        <div class="section-label">Nhập thủ công</div>
+        <div class="manual-row">
+          <input type="text" id="manual-input" placeholder="Nhập mã DHLOG..." autocomplete="off">
+          <button onclick="addManual()"><i class="ti ti-plus"></i> Thêm</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Barcode/QR Panel -->
+    <div class="panel" id="panel-barcode">
+      <div class="bc-card">
+        <div id="bc-cam-area">
+          <div class="bc-placeholder" onclick="startBarcode()">
+            <i class="ti ti-scan"></i>
+            <p>Nhấn để quét Barcode/QR</p>
+            <span>Dùng khi phiếu có mã vạch hoặc QR</span>
+          </div>
+        </div>
+        <div class="bc-actions">
+          <div id="bc-result" style="display:none"></div>
+          <button class="btn-primary" id="bc-btn" onclick="startBarcode()">
+            <i class="ti ti-scan"></i> Bắt đầu quét
+          </button>
+        </div>
+      </div>
+      <div class="manual-card">
+        <div class="section-label">Nhập thủ công</div>
+        <div class="manual-row">
+          <input type="text" id="manual-input-bc" placeholder="Nhập mã vận đơn..." autocomplete="off">
+          <button onclick="addManualBC()"><i class="ti ti-plus"></i> Thêm</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- List (always visible) -->
+    <div class="list-card">
+      <div class="list-hdr">
+        <h2>Danh sách đã lưu</h2>
+        <div class="list-acts">
+          <button class="btn-exp" onclick="exportCSV()"><i class="ti ti-download" style="font-size:14px"></i> CSV</button>
+          <button class="btn-clr" onclick="clearAll()"><i class="ti ti-trash" style="font-size:14px"></i> Xoá</button>
+        </div>
+      </div>
+      <div class="list-inner" id="order-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden canvas for OCR processing -->
+<canvas id="ocr-canvas"></canvas>
+
+<!-- Tesseract OCR -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<!-- ZXing for barcode -->
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
+
+<script>
+const STORAGE_KEY = 'vandon_v2';
+let orders = [];
+try { orders = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(e) {}
+
+/* ── Tesseract worker ── */
+let ocrWorker = null;
+async function getWorker() {
+  if (ocrWorker) return ocrWorker;
+  ocrWorker = await Tesseract.createWorker('eng', 1, {
+    logger: () => {}
+  });
+  // Whitelist: chỉ nhận chữ và số, giúp OCR chuẩn hơn
+  await ocrWorker.setParameters({
+    tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+  });
+  return ocrWorker;
+}
+// Preload worker ngay khi app khởi động
+getWorker().catch(() => {});
+
+/* ── OCR camera stream ── */
+let ocrStream = null;
+async function startOCRCamera() {
+  try {
+    ocrStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+    });
+    document.getElementById('ocr-video').srcObject = ocrStream;
+  } catch(e) {
+    showOCRResult('Không mở được camera: ' + (e.message || ''), 'err');
+  }
+}
+startOCRCamera();
+
+function snapPhoto() {
+  const video = document.getElementById('ocr-video');
+  if (!video.videoWidth) { showOCRResult('Camera chưa sẵn sàng, thử lại', 'warn'); return; }
+  const canvas = document.getElementById('ocr-canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  processOCR(canvas);
+}
+
+function ocrFromFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.getElementById('ocr-canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    URL.revokeObjectURL(img.src);
+    processOCR(canvas);
+  };
+  img.src = URL.createObjectURL(file);
+}
+
+async function processOCR(canvas) {
+  // Show preview
+  const area = document.getElementById('ocr-cam-area');
+  const previewCanvas = document.createElement('canvas');
+  previewCanvas.width = canvas.width; previewCanvas.height = canvas.height;
+  previewCanvas.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block;background:#000';
+  previewCanvas.getContext('2d').drawImage(canvas, 0, 0);
+
+  const overlay = document.createElement('div');
+  overlay.className = 'preview-overlay';
+  overlay.innerHTML = '<div class="processing-text"><div class="spinner"></div><span>Đang nhận dạng chữ...</span></div>';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'preview-wrap';
+  wrap.appendChild(previewCanvas); wrap.appendChild(overlay);
+  area.innerHTML = ''; area.appendChild(wrap);
+
+  showOCRResult('', '');
+  document.getElementById('found-codes').style.display = 'none';
+
+  try {
+    const worker = await getWorker();
+    // Tăng độ tương phản trước khi OCR
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const contrasted = applyContrast(imageData, 1.5);
+    ctx.putImageData(contrasted, 0, 0);
+
+    const { data: { text } } = await worker.recognize(canvas);
+    overlay.remove();
+
+    // Tìm tất cả chuỗi DHLOG...
+    const found = findDHLOG(text);
+    if (found.length > 0) {
+      showFoundCodes(found);
+      showOCRResult(`Tìm thấy ${found.length} mã DHLOG`, 'ok');
+    } else {
+      showOCRResult('Không tìm thấy mã DHLOG trong ảnh. Thử chụp gần hơn, rõ hơn.', 'err');
+    }
+
+    // Nút chụp lại
+    const retakeBtn = document.createElement('button');
+    retakeBtn.className = 'btn-primary';
+    retakeBtn.innerHTML = '<i class="ti ti-camera"></i> Chụp lại';
+    retakeBtn.style.marginTop = '0';
+    retakeBtn.onclick = () => {
+      area.innerHTML = `<div class="cam-live-wrap">
+        <video id="ocr-video" autoplay playsinline muted></video>
+        <div class="cam-guide"><div class="cam-guide-box"></div><span>Căn chỉnh mã DHLOG vào khung rồi nhấn chụp</span></div>
+        <button class="snap-btn" onclick="snapPhoto()"><i class="ti ti-camera"></i></button>
+      </div>`;
+      document.getElementById('ocr-video').srcObject = ocrStream;
+      retakeBtn.remove();
+    };
+    document.getElementById('ocr-result').after(retakeBtn);
+
+  } catch(e) {
+    overlay.remove();
+    showOCRResult('Lỗi OCR: ' + (e.message || 'thử lại'), 'err');
+  }
+}
+
+/* Tăng độ tương phản để OCR nhận chữ in trên phiếu tốt hơn */
+function applyContrast(imageData, factor) {
+  const d = imageData.data;
+  for (let i = 0; i < d.length; i += 4) {
+    d[i]   = clamp((d[i]   - 128) * factor + 128);
+    d[i+1] = clamp((d[i+1] - 128) * factor + 128);
+    d[i+2] = clamp((d[i+2] - 128) * factor + 128);
+  }
+  return imageData;
+}
+function clamp(v) { return Math.max(0, Math.min(255, Math.round(v))); }
+
+/* Tìm mã DHLOG trong text OCR — xử lý lỗi OCR thường gặp */
+function findDHLOG(text) {
+  // Normalize: OCR hay nhầm 0→O, 1→I, 8→B
+  const upper = text.toUpperCase().replace(/\s+/g, ' ');
+  // Tìm pattern DHLOG hoặc biến thể OCR: DHLОГ, DHL0G, DHIOG...
+  const re = /D\s?H\s?[LI1]\s?[O0]\s?G\s?[A-Z0-9]{6,20}/g;
+  const raw = upper.match(re) || [];
+  // Chuẩn hóa: bỏ space, sửa lỗi OCR phổ biến
+  return [...new Set(raw.map(s => {
+    return s.replace(/\s/g,'')
+            .replace(/^DH[I1][O0]G/, 'DHLOG')
+            .replace(/^DHL[O0]G/, 'DHLOG');
+  }))];
+}
+
+function showFoundCodes(codes) {
+  const wrap = document.getElementById('found-codes');
+  const list = document.getElementById('found-list');
+  wrap.style.display = 'block';
+  list.innerHTML = codes.map((c, i) => `
+    <div class="found-item" id="fi${i}">
+      <span class="found-code">${esc(c)}</span>
+      <button class="btn-add-found" id="fab${i}" onclick="addFoundCode('${escA(c)}', ${i})">
+        <i class="ti ti-plus"></i> Lưu
+      </button>
+    </div>
+  `).join('');
+}
+
+function addFoundCode(code, idx) {
+  addCode(code);
+  const btn = document.getElementById('fab' + idx);
+  if (btn) { btn.textContent = '✓ Đã lưu'; btn.className = 'btn-add-found added'; btn.disabled = true; }
+}
+
+function showOCRResult(msg, type) {
+  const el = document.getElementById('ocr-result');
+  if (!msg) { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  el.className = 'flash flash-' + type;
+  el.textContent = msg;
+}
+
+/* ── Tab switching ── */
+function switchTab(tab) {
+  document.getElementById('tab-ocr').className = 'tab' + (tab==='ocr'?' active':'');
+  document.getElementById('tab-barcode').className = 'tab' + (tab==='barcode'?' active':'');
+  document.getElementById('panel-ocr').className = 'panel' + (tab==='ocr'?' active':'');
+  document.getElementById('panel-barcode').className = 'panel' + (tab==='barcode'?' active':'');
+  if (tab === 'barcode' && !bcScanning) startBarcode();
+}
+
+/* ── Barcode/QR (ZXing) ── */
+let bcReader = null, bcScanning = false, bcStream = null;
+
+async function startBarcode() {
+  if (bcScanning) return;
+  bcScanning = true;
+  const area = document.getElementById('bc-cam-area');
+  area.innerHTML = `<div class="bc-cam-wrap">
+    <video id="bc-video" autoplay playsinline muted></video>
+    <div class="bc-overlay"><div class="bc-frame">
+      <div class="c-tl"></div><div class="c-tr"></div>
+      <div class="c-bl"></div><div class="c-br"></div>
+      <div class="bc-line"></div>
+    </div></div>
+    <div class="bc-hint">Đưa barcode hoặc QR vào khung</div>
+  </div>`;
+  setBCBtn('Dừng quét', 'ti-camera-off', stopBarcode, true);
+
+  const hints = new Map();
+  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+    ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.CODE_128,
+    ZXing.BarcodeFormat.CODE_39, ZXing.BarcodeFormat.EAN_13,
+    ZXing.BarcodeFormat.ITF, ZXing.BarcodeFormat.DATA_MATRIX,
+  ]);
+  hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+  bcReader = new ZXing.BrowserMultiFormatReader(hints, 300);
+
+  try {
+    bcStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    const vid = document.getElementById('bc-video');
+    vid.srcObject = bcStream;
+    bcReader.decodeFromStream(bcStream, vid, (result, err) => {
+      if (result) addCode(result.getText());
+    });
+  } catch(e) {
+    bcScanning = false;
+    area.innerHTML = `<div class="bc-placeholder" onclick="startBarcode()"><i class="ti ti-camera-off"></i><p>Không mở được camera</p><span>${e.message||'Kiểm tra quyền truy cập'}</span></div>`;
+    setBCBtn('Thử lại', 'ti-refresh', startBarcode, false);
+  }
+}
+
+function stopBarcode() {
+  bcScanning = false;
+  if (bcReader) { try { bcReader.reset(); } catch(e) {} bcReader = null; }
+  if (bcStream) { bcStream.getTracks().forEach(t=>t.stop()); bcStream = null; }
+  document.getElementById('bc-cam-area').innerHTML = `<div class="bc-placeholder" onclick="startBarcode()"><i class="ti ti-scan"></i><p>Nhấn để quét Barcode/QR</p><span>Dùng khi phiếu có mã vạch hoặc QR</span></div>`;
+  setBCBtn('Bắt đầu quét', 'ti-scan', startBarcode, false);
+}
+
+function setBCBtn(label, icon, fn, isStop) {
+  const btn = document.getElementById('bc-btn');
+  btn.className = isStop ? 'btn-secondary' : 'btn-primary';
+  btn.innerHTML = `<i class="ti ${icon}"></i> ${label}`;
+  btn.onclick = fn;
+}
+
+/* ── Core data ── */
+function detectCarrier(code) {
+  const c = (code||'').toUpperCase();
+  if (/DHLOG/.test(c)) {
+    // Phân biệt theo prefix trước DHLOG
+    if (/^(SBV|BVH|PHV|VTP)/.test(c)) return 'Viettel Post';
+    return 'Viettel Post'; // DHLOG thường là Viettel
+  }
+  if (/^(S|J|P|TDM|GHTK|GHN)/.test(c) && c.length >= 10) return 'GHTK';
+  return '';
+}
+
+function addCode(raw) {
+  const code = (raw||'').trim().toUpperCase();
+  if (!code || code.length < 4) return;
+  if (orders.find(o => o.code === code)) {
+    flashBC('⚠ Mã này đã có trong danh sách', 'warn'); return;
+  }
+  const now = new Date();
+  const time = now.toLocaleString('vi-VN', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit',year:'numeric'});
+  orders.unshift({ code, time, carrier: detectCarrier(code) });
+  save(); renderList();
+  flashBC('✓ Đã lưu: ' + code, 'ok');
+  if (navigator.vibrate) navigator.vibrate(60);
+}
+
+function flashBC(msg, type) {
+  const el = document.getElementById('bc-result');
+  el.style.display = 'flex'; el.className = 'flash flash-' + type; el.textContent = msg;
+  clearTimeout(el._t); el._t = setTimeout(() => { el.style.display = 'none'; }, 3000);
+}
+
+function addManual() {
+  const inp = document.getElementById('manual-input');
+  if (inp.value.trim()) { addCode(inp.value); inp.value = ''; }
+}
+function addManualBC() {
+  const inp = document.getElementById('manual-input-bc');
+  if (inp.value.trim()) { addCode(inp.value); inp.value = ''; }
+}
+document.getElementById('manual-input').addEventListener('keydown', e => { if(e.key==='Enter') addManual(); });
+document.getElementById('manual-input-bc').addEventListener('keydown', e => { if(e.key==='Enter') addManualBC(); });
+
+function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(orders)); } catch(e) {} }
+
+function renderList() {
+  document.getElementById('count-badge').textContent = orders.length;
+  const el = document.getElementById('order-list');
+  if (!orders.length) {
+    el.innerHTML = '<div class="empty-state"><i class="ti ti-inbox"></i>Chưa có mã nào</div>'; return;
+  }
+  el.innerHTML = orders.map((o, i) => {
+    const bc = o.carrier==='Viettel Post'?'c-vtp':o.carrier==='GHTK'?'c-ghtk':'c-other';
+    const badgeHtml = o.carrier ? `<span class="carrier-badge ${bc}">${o.carrier}</span>` : '';
+    return `<div class="order-card">
+      <div class="order-num">${orders.length-i}</div>
+      <div class="order-info">
+        <div class="order-code">${esc(o.code)}</div>
+        <div class="order-meta">${o.time} ${badgeHtml}</div>
+      </div>
+      <button class="copy-btn" id="cb${i}" onclick="copyCode('${escA(o.code)}',${i})">
+        <i class="ti ti-copy" style="font-size:14px"></i> Copy
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escA(s) { return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+
+function copyCode(code, idx) {
+  const done = () => {
+    const btn = document.getElementById('cb'+idx);
+    if (!btn) return;
+    btn.classList.add('copied'); btn.innerHTML='<i class="ti ti-check" style="font-size:14px"></i> Đã copy';
+    setTimeout(()=>{ btn.classList.remove('copied'); btn.innerHTML='<i class="ti ti-copy" style="font-size:14px"></i> Copy'; },2000);
+  };
+  navigator.clipboard && navigator.clipboard.writeText(code).then(done).catch(()=>fbCopy(code,done)) || fbCopy(code,done);
+}
+function fbCopy(t,cb){const a=document.createElement('textarea');a.value=t;a.style.cssText='position:fixed;opacity:0';document.body.appendChild(a);a.focus();a.select();try{document.execCommand('copy')}catch(e){}document.body.removeChild(a);cb&&cb();}
+
+function clearAll() {
+  if (!orders.length) return;
+  if (confirm('Xoá tất cả '+orders.length+' mã?')) { orders=[]; save(); renderList(); }
+}
+function exportCSV() {
+  if (!orders.length) { alert('Chưa có mã nào.'); return; }
+  const rows = [['STT','Mã đơn','Đơn vị','Thời gian']].concat(orders.map((o,i)=>[orders.length-i,o.code,o.carrier||'',o.time]));
+  const csv = '\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+  a.download = 'vandon_'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
+}
+
+renderList();
+</script>
+</body>
+</html>
